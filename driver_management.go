@@ -1,13 +1,13 @@
 package main
 
 import (
-	"database/sql"
 	"encoding/json"
-	"fmt"
+	"enterprise_computing_cw/Database_Management"
 	"github.com/gorilla/mux"
 	_ "github.com/mattn/go-sqlite3"
 	"log"
 	"net/http"
+	"strconv"
 )
 
 type Driver struct {
@@ -16,33 +16,33 @@ type Driver struct {
 	Rate int `json:"Rate"`
 }
 
-func initDb() *sql.DB {
-	db, err := sql.Open("sqlite3", "./driver_management")
-	if err != nil {
-		log.Println(err)
-	}
-	statement, _ := db.Prepare("CREATE TABLE IF NOT EXISTS drivers (id INTEGER PRIMARY KEY, Drivername TEXT, Rate INTEGER )")
-	_, err = statement.Exec()
-	if err != nil {
-		log.Println(err)
-	}
-	return db
-}
-
-
 
 func getAllDriversHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	db := initDb()
 	var id int
 	var DriverName string
 	var Rate int
-
-	// create array
 	var drivers []Driver
 
-	rows, _ := db.Query("SELECT id, Drivername, Rate FROM drivers")
+
+	driverSchema := Database_Management.Database{
+		DbName: "./driver_management",
+		Query:  "SELECT id, Drivername, Rate FROM drivers",
+	}
+
+	//driverSchema.Query = "SELECT id, Drivername, Rate FROM drivers"
+	rows, err := driverSchema.QueryDB()
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if rows == nil {
+		http.Error(w, "No users found", http.StatusOK)
+		return
+	}
 
 	for rows.Next() {
 		err := rows.Scan(&id, &DriverName, &Rate)
@@ -55,85 +55,91 @@ func getAllDriversHandler(w http.ResponseWriter, r *http.Request) {
 			Rate:       Rate,
 		})
 	}
-	err := json.NewEncoder(w).Encode(drivers)
-	if err != nil {
-		log.Println(err)
-	} else {
-		log.Println("Get drivers")
-		_ = db.Close()
 
+	err = json.NewEncoder(w).Encode(drivers)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusOK)
+		return
 	}
+
 }
 
 
 func updateDriverHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
-	// parse path params
 	vars := mux.Vars(r)
-	driverName := vars["driver"]
+	driverId := vars["id"]
+
 	var driver Driver
 	err := json.NewDecoder(r.Body).Decode(&driver)
-	if err != nil {
-		log.Println(err)
-		//http.Error(w, err.Error(), http.StatusBadRequest)
-		//return
-	} else {
-		log.Println(driver.Rate)
-	}
-
-	db := initDb()
-
-	query := "UPDATE drivers SET Rate = ? WHERE Drivername = ?"
-	statement, _ := db.Prepare(query)
-	_, err = statement.Exec(driver.Rate, driverName)
-	if err != nil {
-		log.Println(err)
-	} else {
-		log.Println("Updated driver")
-		_ = db.Close()
-	}
-
-}
-
-
-func getDriverHandler(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	driverName := vars["driver"]
-	db := initDb()
-	query :=  "SELECT id, Drivername, Rate FROM drivers WHERE Drivername = ?"
-	statement, _ := db.Prepare(query)
-
-	rows, err := statement.Query(driverName)
-
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
+	driverSchema := Database_Management.Database{
+		DbName: "./driver_management",
+		Query:  "UPDATE drivers SET Rate = (" + "'" + strconv.Itoa(driver.Rate) +"'"+ ") " +
+			"WHERE id = (" + "'" + driverId + "'" + ")",
+	}
+
+	err = driverSchema.ExecDB()
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	} else {
+		http.Error(w, "Driver updated", http.StatusOK)
+		return
+	}
+}
+
+
+func getDriverHandler(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	driverId := vars["id"]
+
+	driverSchema := Database_Management.Database{
+		DbName: "./driver_management",
+		Query:  "SELECT id, Drivername, Rate FROM drivers WHERE id=('" + driverId + "')",
+	}
+
+	rows, err := driverSchema.QueryDB()
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if rows == nil {
+		http.Error(w, "No driver found", http.StatusOK)
+		return
+	}
+
 	var id, rate int
-	var drivername string
+	var driverName string
+	//var driverName string
 	var driver Driver
 
 	for rows.Next() {
-		err := rows.Scan(&id, &drivername, &rate)
-		if err != nil {
-			log.Println(err)
-		}
+		err := rows.Scan(&id, &driverName, &rate)
+
 		driver = Driver{
 			Id: id,
 			DriverName: driverName,
 			Rate: rate,
 		}
-		fmt.Println(driver)
+
 		err = json.NewEncoder(w).Encode(driver)
 		if err != nil {
-			log.Println(err)
+			http.Error(w, "Json encode error", http.StatusOK)
+			return
 		}
-
 	}
 
-
+	http.Error(w, "No Driver found", http.StatusOK)
+	return
 
 }
 
@@ -148,19 +154,19 @@ func createDriverHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	db := initDb()
-
-	statement, err := db.Prepare("INSERT INTO drivers (Drivername, Rate) VALUES (?, ?)")
-	if err != nil {
-		log.Println(err)
+	driverSchema := Database_Management.Database{
+		DbName: "./driver_management",
+		Query:  "INSERT INTO drivers (Drivername, Rate) VALUES ('" + driver.DriverName + "' , '" + strconv.Itoa(driver.Rate) + "')",
 	}
-	_, err = statement.Exec(driver.DriverName, driver.Rate)
-	if err != nil {
-		log.Println(err)
-	} else {
-		log.Println("Created new driver")
-		_ = db.Close()
 
+	err = driverSchema.ExecDB()
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	} else {
+		http.Error(w, "Driver added", http.StatusOK)
+		return
 	}
 
 }

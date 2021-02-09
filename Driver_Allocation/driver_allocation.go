@@ -1,12 +1,8 @@
-//package Driver_Allocation
-
-package main
+package Driver_Allocation
 
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
-	"log"
 	"math"
 	"net/http"
 	"strconv"
@@ -30,21 +26,19 @@ type Response []struct{
 type Roster []struct {
 	Id int `json:"id"`
 	DriverName string `json:"DriverName"`
-	Rate int `json:"Rate"`
+	Rate float64 `json:"Rate"`
 }
 
 
 func getSurgePricingTimeHandler(currPrice float64) float64 {
 	hour := time.Now().Hour()
 	if hour > 23 || hour < 6 {
-		fmt.Println(strconv.Itoa(hour) + ":00, Surge pricing added")
 		return currPrice * 2
 	}
-	fmt.Println(strconv.Itoa(hour) + ":00, Surge pricing not added")
 	return currPrice
 }
 
-func getSurgePricingRouteHandler(origin string, destination string, driverRate float64) float64 {
+func getSurgePricingRouteHandler(origin string, destination string, driverRate float64) (float64, error) {
 
 	postBody, _ := json.Marshal(map[string]string {
 			"Origin": origin,
@@ -55,13 +49,13 @@ func getSurgePricingRouteHandler(origin string, destination string, driverRate f
 
 	body, err := http.Post("http://localhost:10000/directions", "application/json", responseBody)
 	if err != nil {
-		log.Println(err)
+		return 0, err
 	}
 
 	var res Response
 	err = json.NewDecoder(body.Body).Decode(&res)
 	if err != nil {
-		fmt.Println(err)
+		return 0, err
 	}
 
 	legs := res[0].Legs[0]
@@ -74,37 +68,38 @@ func getSurgePricingRouteHandler(origin string, destination string, driverRate f
 		if isARoad {
 			numARoads += 1
 		}
-		roadDistance := distanceHelper(distance)
+		roadDistance, err := distanceHelper(distance)
+		if err != nil {
+			return 0, err
+		}
 		totalDistance += roadDistance
 		if i == len(legs.Steps) - 1 {
 
 			if i / numARoads < 2 {
-				fmt.Println("Majority A roads")
-				fmt.Println("Total distance: ", totalDistance, "km")
-				return driverRate * totalDistance * 2
+				return driverRate * totalDistance * 2, nil
 			}
 			if i / numARoads >= 2 {
-				fmt.Println("Minority A roads")
-				fmt.Println("Total distance: ", totalDistance, "km")
-				return driverRate * totalDistance
+				return driverRate * totalDistance, nil
 			}
 		}
 	}
 
-	defer body.Body.Close()
-
-	return 0
+	err = body.Body.Close()
+	if err != nil {
+		return 0, err
+	}
+	return 0, err
 
 }
 
 
-func distanceHelper(distance string) float64 {
+func distanceHelper(distance string) (float64, error) {
 	var number float64
 	for pos, char := range distance {
 		if string(char) == "m" || string(char) == "k" {
 			i, err := strconv.ParseFloat(distance[0: pos - 1], 64)
 			if err != nil {
-				log.Println(err)
+				return 0, err
 			}
 			if string(char) == "m" {
 				i = i / 1000
@@ -113,7 +108,7 @@ func distanceHelper(distance string) float64 {
 			break
 		}
 	}
-	return number
+	return number, nil
 
 }
 
@@ -130,24 +125,34 @@ func instructionsHelper(instructions string) bool {
 }
 
 
-func getSurgePricingRosterHandler(origin string, destination string) int {
+func getSurgePricingRosterHandler(origin string, destination string) (struct {
+	Id         int    `json:"id"`
+	DriverName string `json:"DriverName"`
+	Rate       float64    `json:"Rate"`
+}, error) {
 	body, err := http.Get("http://localhost:10000/rosters")
 	if err != nil {
-		log.Println(err)
+		return struct {
+	Id         int    `json:"id"`
+	DriverName string `json:"DriverName"`
+	Rate       float64    `json:"Rate"`
+	}{0, "", 0}, err
 	}
 
 	var roster Roster
 	err = json.NewDecoder(body.Body).Decode(&roster)
 	if err != nil {
-		fmt.Println(err)
-	} else {
-		fmt.Println(roster)
+		return roster[0], err
 	}
 
 	currBest := math.Inf(1)
 	var driverIndex int
 	for i, driver := range roster {
-		currPrice := getSurgePricingTimeHandler(getSurgePricingRouteHandler(origin, destination, float64(driver.Rate)))
+		routePrice, err := getSurgePricingRouteHandler(origin, destination, float64(driver.Rate))
+		if err != nil {
+			return roster[0], err
+		}
+		currPrice := getSurgePricingTimeHandler(routePrice)
 		if len(roster) < 5 {
 			currPrice *= 2
 		}
@@ -155,19 +160,42 @@ func getSurgePricingRosterHandler(origin string, destination string) int {
 			currBest = currPrice
 			driverIndex = i
 		}
-
 	}
 
-	fmt.Println(currBest, roster[driverIndex])
+	err = body.Body.Close()
+	if err != nil {
+		return roster[0], err
+	}
+	roster[driverIndex].Rate = currBest
+	return roster[driverIndex], nil
 
-	defer body.Body.Close()
-	return 0
 }
 
 
+func GetBestDriver(w http.ResponseWriter, r *http.Request) {
+	var journee struct {
+		Origin string `json:"Origin"`
+		Destination string `json:"Destination"`
+	}
 
+	err := json.NewDecoder(r.Body).Decode(&journee)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
-func main() {
+	bestDriver, err := getSurgePricingRosterHandler(journee.Origin, journee.Destination)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
-	getSurgePricingRosterHandler("London", "Manchester")
+	err = json.NewEncoder(w).Encode(bestDriver)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	} else {
+		http.Error(w, "", http.StatusOK)
+	}
+
 }
+

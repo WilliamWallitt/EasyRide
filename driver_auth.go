@@ -1,29 +1,33 @@
 package main
 
 import (
-	"database/sql"
 	"encoding/json"
+	"enterprise_computing_cw/Database_Management"
 	"fmt"
 	_ "github.com/mattn/go-sqlite3"
 	"golang.org/x/crypto/bcrypt"
 	"log"
 	"net/http"
-	"strconv"
 	"time"
+	"github.com/dgrijalva/jwt-go"
+
 )
 
-// dummy data
 type Auth struct {
 	Username string `json:"Username"`
 	Password string `json:"Password"`
 }
 
-type Error struct {
-	Message string `json:"Error"`
+// jwt stuff
+var jwtKey = []byte("my_secret_key")
+
+type Claims struct {
+	Username string `json:"Username"`
+	jwt.StandardClaims
 }
 
 
-// password handling
+
 
 func hashAndSaltPwd(pwd string) string {
 	byte_pwd := []byte(pwd)
@@ -45,10 +49,8 @@ func verifyPassword(hash string, pwd []byte) bool {
 }
 
 
-// run after the req handler
-func authPage(w http.ResponseWriter, r *http.Request) {
-	// would render the authentication page
-	fmt.Println("Endpoint: authPage")
+func redirectToLogin(w http.ResponseWriter, r *http.Request) {
+	http.Redirect(w, r, "/auth/login", http.StatusSeeOther)
 }
 
 
@@ -62,17 +64,18 @@ func signUp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	db, err := sql.Open("sqlite3", "./driver_auth")
-	statement, _ := db.Prepare("CREATE TABLE IF NOT EXISTS auth (id INTEGER PRIMARY KEY, Username TEXT, Password TEXT)")
-	statement.Exec()
-	statement, _ = db.Prepare("INSERT INTO auth (Username, Password) VALUES (?, ?)")
-	statement.Exec(newUser.Username, hashAndSaltPwd(newUser.Password))
+	authSchema := Database_Management.Database{
+		DbName: "./driver_auth",
+		Query:  "",
+	}
 
-	err = db.Close()
+	authSchema.Query = "INSERT INTO auth (Username, Password) VALUES (" + "'" + newUser.Username + "'" + ", " + "'" + hashAndSaltPwd(newUser.Password) + "'" + ")"
+	err = authSchema.ExecDB()
+
 	if err != nil {
-		log.Println(err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 	} else {
-		log.Println("DB successfully closed")
+		http.Error(w, "Sign up successful", http.StatusOK)
 	}
 
 }
@@ -87,24 +90,36 @@ func signIn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	db, err := sql.Open("sqlite3", "./driver_auth")
-	if err != nil {
-		panic(err)
+	authSchema := Database_Management.Database{
+		DbName: "./driver_auth",
+		Query:  "SELECT Username, Password FROM auth",
 	}
 
-	rows, _ := db.Query("SELECT Username, Password FROM auth")
+	rows, err := authSchema.QueryDB()
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if rows == nil {
+		http.Error(w, "No users found", http.StatusInternalServerError)
+		return
+	}
 
 	var Username string
 	var Password string
+
 	for rows.Next() {
+
 		err = rows.Scan(&Username, &Password)
-		if err != nil {
-			log.Println(err)
-		}
 
 		if Username == newUser.Username && verifyPassword(Password, []byte(newUser.Password)) {
 
 			expiration := time.Now().Add(24 * time.Hour)
+
+			//jwt new logic
+
 			cookie := http.Cookie{
 				Name: "username",
 				Value: newUser.Username,
@@ -112,68 +127,62 @@ func signIn(w http.ResponseWriter, r *http.Request) {
 			}
 
 			http.SetCookie(w, &cookie)
-
-
-			if err != nil {
-				log.Println(err)
-			}
-
-			err = json.NewEncoder(w).Encode(Error{
-				Message: "Login success, cookie set",
-			})
-
-			if err != nil {
-				log.Println(err)
-			}
-
+			http.Error(w, "Login success, cookie set", http.StatusOK)
 			return
 		}
 	}
 
-	err = json.NewEncoder(w).Encode(Error{
-		Message: "Username or password incorrect",
-	})
-
-	if err != nil {
-		log.Println(err)
-	}
-
-	err = db.Close()
-	if err != nil {
-		log.Println(err)
-	} else {
-		log.Println("DB successfully closed")
-	}
-
+	http.Error(w, "Login failed, username or password incorrect", http.StatusBadRequest)
+	return
 }
 
 func getAllUsers(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Println("Endpoint: getAllUsers")
 
-	db, err := sql.Open("sqlite3", "./driver_auth")
-	statement, _ := db.Prepare("CREATE TABLE IF NOT EXISTS auth (id INTEGER PRIMARY KEY, Username TEXT, Password TEXT)")
-	statement.Exec()
+	authSchema := Database_Management.Database{
+		DbName: "./driver_auth",
+		Query:  "SELECT id, Username, Password FROM auth",
+	}
 
-	rows, _ := db.Query("SELECT id, Username, Password FROM auth")
+	rows, err := authSchema.QueryDB()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if rows == nil {
+		http.Error(w, "No users found", http.StatusBadRequest)
+		return
+	}
+
+	type Users struct {
+		Id int
+		Username string
+		Password string
+	}
+
+	var AllUsers []Users
 	var id int
 	var Username string
 	var Password string
+
 	for rows.Next() {
 		err := rows.Scan(&id, &Username, &Password)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 		}
-		fmt.Fprint(w, "id:" + strconv.Itoa(id) + " Username : " + Username + " Password : " +  Password + "\n")
-	}
-	if err != nil {
-		panic(err)
+		AllUsers = append(AllUsers, Users{
+			Id: id,
+			Username: Username,
+			Password: Password,
+		})
 	}
 
-	err = db.Close()
+	err = json.NewEncoder(w).Encode(AllUsers)
 	if err != nil {
-		log.Println(err)
-	} else {
-		log.Println("DB successfully closed")
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
+
+
 }

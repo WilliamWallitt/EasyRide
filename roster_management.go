@@ -1,9 +1,8 @@
 package main
 
 import (
-	"database/sql"
 	"encoding/json"
-	"fmt"
+	"enterprise_computing_cw/Database_Management"
 	"github.com/gorilla/mux"
 	_ "github.com/mattn/go-sqlite3"
 	"log"
@@ -17,75 +16,60 @@ type Roster struct {
 	Rate int `json:"Rate"`
 }
 
-var dbName string = "roster_management"
 
-//"CREATE TABLE IF NOT EXISTS roster (id INTEGER PRIMARY KEY, Drivername TEXT, Rate INTEGER )"
+func AddDriverToRoster(driver Roster) error {
 
+	rosterSchema := Database_Management.Database{
+		DbName: "./roster_management",
+		Query:  "INSERT INTO roster (Drivername, Rate) VALUES " +
+			"('" + driver.DriverName + "'" +
+			",'"  + strconv.Itoa(driver.Rate) + "')",
+	}
 
-func CreateRoster(dbName string, query string) *sql.DB {
-	db, err := sql.Open("sqlite3", "./" + dbName)
-	if err != nil {
-		log.Println(err)
-	}
-	statement, _ := db.Prepare(query)
-	_, err = statement.Exec()
-	if err != nil {
-		log.Println(err)
-	}
-	return db
-}
+	err := rosterSchema.ExecDB()
 
-func AddDriverToRoster(dbName string, driver Roster) {
-	db, err := sql.Open("sqlite3", "./" + dbName)
 	if err != nil {
-		log.Println(err)
-	}
-	statement, err := db.Prepare("INSERT INTO roster (id, Drivername, Rate) VALUES (?, ?, ?)")
-	if err != nil {
-		log.Println(err)
-	}
-	_, err = statement.Exec(driver.Id, driver.DriverName, driver.Rate)
-	if err != nil {
-		log.Println(err)
+		return err
 	} else {
-		log.Println("Added driver to roster")
+		return nil
 	}
 
 }
 
-func RemoveDriverFromRoster(dbName string, id int) {
+func RemoveDriverFromRoster(id int) error {
 
-	db, err := sql.Open("sqlite3", "./" + dbName)
-	if err != nil {
-		log.Println(err)
+	rosterSchema := Database_Management.Database{
+		DbName: "./roster_management",
+		Query:  "DELETE FROM roster WHERE id=('" + strconv.Itoa(id) + "')",
 	}
-	statement, err := db.Prepare("DELETE FROM roster WHERE id = ?")
+
+	err := rosterSchema.ExecDB()
+
 	if err != nil {
-		log.Println(err)
-	}
-	_, err = statement.Exec(id)
-	if err != nil {
-		log.Println(err)
+		return err
 	} else {
-		log.Println("Deleted driver from roster")
+		return nil
 	}
 
 }
 
-func GetAllDriversFromRoster(dbName string) []Roster {
-	db, err := sql.Open("sqlite3", "./" + dbName)
-	if err != nil {
-		log.Println(err)
+func GetAllDriversFromRoster() []Roster {
+
+	rosterSchema := Database_Management.Database{
+		DbName: "./roster_management",
+		Query:  "SELECT id, Drivername, Rate FROM roster",
 	}
-	statement, err := db.Prepare("SELECT id, Drivername, Rate FROM roster")
-	if err != nil {
-		log.Println(err)
+
+	rows, _ := rosterSchema.QueryDB()
+
+	if rows == nil {
+		return []Roster{}
 	}
+
 	var id, rate int
 	var driverName string
 	var roster []Roster
 
-	rows, _ := statement.Query()
 	for rows.Next() {
 		err := rows.Scan(&id, &driverName, &rate)
 		if err != nil {
@@ -103,11 +87,11 @@ func GetAllDriversFromRoster(dbName string) []Roster {
 
 
 func getCurrentRosterHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
 
-	err := json.NewEncoder(w).Encode(GetAllDriversFromRoster(dbName))
+	w.Header().Set("Content-Type", "application/json")
+	err := json.NewEncoder(w).Encode(GetAllDriversFromRoster())
 	if err != nil {
-		log.Println(err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
 	}
 
 }
@@ -116,10 +100,18 @@ func addDriverToRosterHandler(w http.ResponseWriter, r *http.Request) {
 	var driver Roster
 	err := json.NewDecoder(r.Body).Decode(&driver)
 	if err != nil {
-		log.Println(err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
 	}
 
-	AddDriverToRoster(dbName, driver)
+	err = AddDriverToRoster(driver)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	} else {
+		http.Error(w, "Driver added to roster", http.StatusOK)
+		return
+	}
 }
 
 
@@ -128,10 +120,17 @@ func removeDriverFromRoster(w http.ResponseWriter, r *http.Request) {
 	driver_id := vars["id"]
 	int, err := strconv.Atoi(driver_id)
 	if err != nil {
-		fmt.Println(err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	RemoveDriverFromRoster(dbName, int)
+	err = RemoveDriverFromRoster(int)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	} else {
+		http.Error(w, "Driver removed from roster", http.StatusOK)
+		return
+	}
 }
 
 

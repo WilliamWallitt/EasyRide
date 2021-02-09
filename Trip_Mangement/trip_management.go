@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"googlemaps.github.io/maps"
-	"log"
 	"net/http"
 )
 
@@ -14,11 +13,10 @@ type Directions struct {
 }
 
 
-
-func Getdirections(origin string, destination string, apikey string) []maps.Route {
+func GetDirections(origin string, destination string, apikey string) ([]maps.Route, error) {
 	c, err := maps.NewClient(maps.WithAPIKey(apikey))
 	if err != nil {
-		log.Fatal("Error", err)
+		return nil, err
 	}
 	r := &maps.DirectionsRequest{
 		Origin: origin,
@@ -26,9 +24,9 @@ func Getdirections(origin string, destination string, apikey string) []maps.Rout
 	}
 	route, _, err := c.Directions(context.Background(), r)
 	if err != nil {
-		log.Fatal("Error", err)
+		return nil, err
 	}
-	return route
+	return route, nil
 
 }
 
@@ -40,9 +38,12 @@ func DirectionsHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	}
-
-	err = json.NewEncoder(w).Encode(Getdirections(directions.Origin, directions.Destination, "AIzaSyB2rJrmiL6i3APBb-IMOoykhj8IYqiWc6k"))
+	route, err := GetDirections(directions.Origin, directions.Destination, "AIzaSyB2rJrmiL6i3APBb-IMOoykhj8IYqiWc6k")
 	if err != nil {
-		log.Fatal(err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	}
+	err = json.NewEncoder(w).Encode(route)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
 	}
 }
