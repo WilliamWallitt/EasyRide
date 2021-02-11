@@ -130,7 +130,10 @@ func getSurgePricingRosterHandler(origin string, destination string) (struct {
 	DriverName string `json:"DriverName"`
 	Rate       float64    `json:"Rate"`
 }, error) {
+
+
 	body, err := http.Get("http://localhost:10000/rosters")
+
 	if err != nil {
 		return struct {
 	Id         int    `json:"id"`
@@ -142,13 +145,17 @@ func getSurgePricingRosterHandler(origin string, destination string) (struct {
 	var roster Roster
 	err = json.NewDecoder(body.Body).Decode(&roster)
 	if err != nil {
-		return roster[0], err
+		return struct {
+			Id         int    `json:"id"`
+			DriverName string `json:"DriverName"`
+			Rate       float64    `json:"Rate"`
+		}{0, "", 0}, err
 	}
 
 	currBest := math.Inf(1)
 	var driverIndex int
 	for i, driver := range roster {
-		routePrice, err := getSurgePricingRouteHandler(origin, destination, float64(driver.Rate))
+		routePrice, err := getSurgePricingRouteHandler(origin, destination, driver.Rate)
 		if err != nil {
 			return roster[0], err
 		}
@@ -172,29 +179,33 @@ func getSurgePricingRosterHandler(origin string, destination string) (struct {
 }
 
 
-func GetBestDriver(w http.ResponseWriter, r *http.Request) {
-	var journee struct {
+func GetBestDriverHandler(w http.ResponseWriter, r *http.Request) {
+
+	var journey struct {
 		Origin string `json:"Origin"`
 		Destination string `json:"Destination"`
 	}
 
-	err := json.NewDecoder(r.Body).Decode(&journee)
+	err := json.NewDecoder(r.Body).Decode(&journey)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
-	bestDriver, err := getSurgePricingRosterHandler(journee.Origin, journee.Destination)
+
+	bestDriver, err := getSurgePricingRosterHandler(journey.Origin, journey.Destination)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		w.WriteHeader(http.StatusNoContent)
 		return
 	}
 
 	err = json.NewEncoder(w).Encode(bestDriver)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
 	} else {
-		http.Error(w, "", http.StatusOK)
+		w.WriteHeader(http.StatusOK)
+		return
 	}
 
 }

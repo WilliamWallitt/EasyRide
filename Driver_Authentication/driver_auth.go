@@ -1,16 +1,15 @@
-package main
+package Driver_Authentication
 
 import (
 	"encoding/json"
 	"enterprise_computing_cw/Database_Management"
 	"fmt"
+	"github.com/dgrijalva/jwt-go"
 	_ "github.com/mattn/go-sqlite3"
 	"golang.org/x/crypto/bcrypt"
 	"log"
 	"net/http"
 	"time"
-	"github.com/dgrijalva/jwt-go"
-
 )
 
 type Auth struct {
@@ -25,8 +24,6 @@ type Claims struct {
 	Username string `json:"Username"`
 	jwt.StandardClaims
 }
-
-
 
 
 func hashAndSaltPwd(pwd string) string {
@@ -49,61 +46,53 @@ func verifyPassword(hash string, pwd []byte) bool {
 }
 
 
-func redirectToLogin(w http.ResponseWriter, r *http.Request) {
-	http.Redirect(w, r, "/auth/login", http.StatusSeeOther)
-}
-
-
-func signUp(w http.ResponseWriter, r *http.Request) {
+func SignUp(w http.ResponseWriter, r *http.Request) {
 	//w.Header().Set("Content-Type", "application/json")
 	fmt.Println("Endpoint: signUp")
 	var newUser Auth
 	err := json.NewDecoder(r.Body).Decode(&newUser)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
 	authSchema := Database_Management.Database{
-		DbName: "./driver_auth",
-		Query:  "",
+		DbName: Database_Management.DriverAuthDBPath,
+		Query:  "INSERT INTO auth (Username, Password) VALUES (" + "'" + newUser.Username + "'" + ", " + "'" + hashAndSaltPwd(newUser.Password) + "'" + ")",
 	}
 
-	authSchema.Query = "INSERT INTO auth (Username, Password) VALUES (" + "'" + newUser.Username + "'" + ", " + "'" + hashAndSaltPwd(newUser.Password) + "'" + ")"
 	err = authSchema.ExecDB()
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	} else {
-		http.Error(w, "Sign up successful", http.StatusOK)
+		w.WriteHeader(http.StatusInternalServerError)
 	}
 
 }
 
-func signIn(w http.ResponseWriter, r *http.Request) {
+func SignIn(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	fmt.Println("Endpoint: signIn")
 	var newUser Auth
 	err := json.NewDecoder(r.Body).Decode(&newUser)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
 	authSchema := Database_Management.Database{
-		DbName: "./driver_auth",
+		DbName: Database_Management.DriverAuthDBPath,
 		Query:  "SELECT Username, Password FROM auth",
 	}
 
 	rows, err := authSchema.QueryDB()
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
 	if rows == nil {
-		http.Error(w, "No users found", http.StatusInternalServerError)
+		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
 
@@ -118,41 +107,55 @@ func signIn(w http.ResponseWriter, r *http.Request) {
 
 			expiration := time.Now().Add(24 * time.Hour)
 
-			//jwt new logic
-
-			cookie := http.Cookie{
-				Name: "username",
-				Value: newUser.Username,
-				Expires: expiration,
+			// create claims struct with username, expiration date
+			claims := &Claims{
+				Username: newUser.Username,
+				StandardClaims: jwt.StandardClaims{
+					ExpiresAt: expiration.Unix(),
+				},
 			}
 
-			http.SetCookie(w, &cookie)
-			http.Error(w, "Login success, cookie set", http.StatusOK)
+			// create token with server secret + claims data
+			token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+			// token -> string(token)
+			tokenString, err := token.SignedString(jwtKey)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			// create client cookie, which stores the token
+			http.SetCookie(w, &http.Cookie{
+				Name: "token",
+				Path: "/",
+				Value: tokenString,
+				Expires: expiration,
+			})
 			return
 		}
 	}
 
-	http.Error(w, "Login failed, username or password incorrect", http.StatusBadRequest)
+	w.WriteHeader(http.StatusUnauthorized)
+	http.Error(w, "Login failed, username or password incorrect", http.StatusUnauthorized)
 	return
 }
 
-func getAllUsers(w http.ResponseWriter, r *http.Request) {
+func GetAllUsers(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Println("Endpoint: getAllUsers")
 
 	authSchema := Database_Management.Database{
-		DbName: "./driver_auth",
+		DbName: Database_Management.DriverAuthDBPath,
 		Query:  "SELECT id, Username, Password FROM auth",
 	}
 
 	rows, err := authSchema.QueryDB()
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
 	if rows == nil {
-		http.Error(w, "No users found", http.StatusBadRequest)
+		w.WriteHeader(http.StatusNoContent)
 		return
 	}
 
@@ -170,7 +173,8 @@ func getAllUsers(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		err := rows.Scan(&id, &Username, &Password)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
 		}
 		AllUsers = append(AllUsers, Users{
 			Id: id,
@@ -181,7 +185,8 @@ func getAllUsers(w http.ResponseWriter, r *http.Request) {
 
 	err = json.NewEncoder(w).Encode(AllUsers)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 
 

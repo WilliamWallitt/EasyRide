@@ -36,14 +36,14 @@ func DirectionsHandler(w http.ResponseWriter, r *http.Request) {
 	var directions Directions
 	err := json.NewDecoder(r.Body).Decode(&directions)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		w.WriteHeader(http.StatusBadRequest)
 	}
 	route, err := GetDirections(directions.Origin, directions.Destination, "AIzaSyB2rJrmiL6i3APBb-IMOoykhj8IYqiWc6k")
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		w.WriteHeader(http.StatusBadRequest)
 	}
 	err = json.NewEncoder(w).Encode(route)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		w.WriteHeader(http.StatusInternalServerError)
 	}
 }

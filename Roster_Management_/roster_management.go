@@ -1,4 +1,4 @@
-package main
+package Roster_Management_
 
 import (
 	"encoding/json"
@@ -20,7 +20,7 @@ type Roster struct {
 func AddDriverToRoster(driver Roster) error {
 
 	rosterSchema := Database_Management.Database{
-		DbName: "./roster_management",
+		DbName: Database_Management.RosterDBPath,
 		Query:  "INSERT INTO roster (Drivername, Rate) VALUES " +
 			"('" + driver.DriverName + "'" +
 			",'"  + strconv.Itoa(driver.Rate) + "')",
@@ -39,7 +39,7 @@ func AddDriverToRoster(driver Roster) error {
 func RemoveDriverFromRoster(id int) error {
 
 	rosterSchema := Database_Management.Database{
-		DbName: "./roster_management",
+		DbName: Database_Management.RosterDBPath,
 		Query:  "DELETE FROM roster WHERE id=('" + strconv.Itoa(id) + "')",
 	}
 
@@ -56,7 +56,7 @@ func RemoveDriverFromRoster(id int) error {
 func GetAllDriversFromRoster() []Roster {
 
 	rosterSchema := Database_Management.Database{
-		DbName: "./roster_management",
+		DbName: Database_Management.RosterDBPath,
 		Query:  "SELECT id, Drivername, Rate FROM roster",
 	}
 
@@ -86,49 +86,48 @@ func GetAllDriversFromRoster() []Roster {
 }
 
 
-func getCurrentRosterHandler(w http.ResponseWriter, r *http.Request) {
+func GetCurrentRosterHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
+
 	err := json.NewEncoder(w).Encode(GetAllDriversFromRoster())
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 
 }
 
-func addDriverToRosterHandler(w http.ResponseWriter, r *http.Request) {
+func AddDriverToRosterHandler(w http.ResponseWriter, r *http.Request) {
 	var driver Roster
 	err := json.NewDecoder(r.Body).Decode(&driver)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
 	err = AddDriverToRoster(driver)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	} else {
-		http.Error(w, "Driver added to roster", http.StatusOK)
+		w.WriteHeader(http.StatusCreated)
 		return
 	}
 }
 
 
-func removeDriverFromRoster(w http.ResponseWriter, r *http.Request) {
+func RemoveDriverFromRosterHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	driver_id := vars["id"]
 	int, err := strconv.Atoi(driver_id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	err = RemoveDriverFromRoster(int)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	} else {
-		http.Error(w, "Driver removed from roster", http.StatusOK)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 }

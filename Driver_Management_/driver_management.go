@@ -1,4 +1,4 @@
-package main
+package Driver_Management_
 
 import (
 	"encoding/json"
@@ -17,7 +17,8 @@ type Driver struct {
 }
 
 
-func getAllDriversHandler(w http.ResponseWriter, r *http.Request) {
+func GetAllDriversHandler(w http.ResponseWriter, r *http.Request) {
+
 	w.Header().Set("Content-Type", "application/json")
 
 	var id int
@@ -27,7 +28,7 @@ func getAllDriversHandler(w http.ResponseWriter, r *http.Request) {
 
 
 	driverSchema := Database_Management.Database{
-		DbName: "./driver_management",
+		DbName: Database_Management.DriverDBPath,
 		Query:  "SELECT id, Drivername, Rate FROM drivers",
 	}
 
@@ -35,12 +36,12 @@ func getAllDriversHandler(w http.ResponseWriter, r *http.Request) {
 	rows, err := driverSchema.QueryDB()
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
 	if rows == nil {
-		http.Error(w, "No users found", http.StatusOK)
+		w.WriteHeader(http.StatusNoContent)
 		return
 	}
 
@@ -58,14 +59,14 @@ func getAllDriversHandler(w http.ResponseWriter, r *http.Request) {
 
 	err = json.NewEncoder(w).Encode(drivers)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusOK)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
 }
 
 
-func updateDriverHandler(w http.ResponseWriter, r *http.Request) {
+func UpdateDriverHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	vars := mux.Vars(r)
@@ -74,12 +75,12 @@ func updateDriverHandler(w http.ResponseWriter, r *http.Request) {
 	var driver Driver
 	err := json.NewDecoder(r.Body).Decode(&driver)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
 	driverSchema := Database_Management.Database{
-		DbName: "./driver_management",
+		DbName: Database_Management.DriverDBPath,
 		Query:  "UPDATE drivers SET Rate = (" + "'" + strconv.Itoa(driver.Rate) +"'"+ ") " +
 			"WHERE id = (" + "'" + driverId + "'" + ")",
 	}
@@ -87,33 +88,30 @@ func updateDriverHandler(w http.ResponseWriter, r *http.Request) {
 	err = driverSchema.ExecDB()
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	} else {
-		http.Error(w, "Driver updated", http.StatusOK)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 }
 
 
-func getDriverHandler(w http.ResponseWriter, r *http.Request) {
+func GetDriverHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	driverId := vars["id"]
 
 	driverSchema := Database_Management.Database{
-		DbName: "./driver_management",
+		DbName: Database_Management.DriverDBPath,
 		Query:  "SELECT id, Drivername, Rate FROM drivers WHERE id=('" + driverId + "')",
 	}
 
 	rows, err := driverSchema.QueryDB()
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
 	if rows == nil {
-		http.Error(w, "No driver found", http.StatusOK)
+		w.WriteHeader(http.StatusNoContent)
 		return
 	}
 
@@ -133,39 +131,36 @@ func getDriverHandler(w http.ResponseWriter, r *http.Request) {
 
 		err = json.NewEncoder(w).Encode(driver)
 		if err != nil {
-			http.Error(w, "Json encode error", http.StatusOK)
+			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 	}
 
-	http.Error(w, "No Driver found", http.StatusOK)
-	return
-
 }
 
 
-func createDriverHandler(w http.ResponseWriter, r *http.Request) {
+func CreateDriverHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	var driver Driver
 	err := json.NewDecoder(r.Body).Decode(&driver)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
 	driverSchema := Database_Management.Database{
-		DbName: "./driver_management",
+		DbName: Database_Management.DriverDBPath,
 		Query:  "INSERT INTO drivers (Drivername, Rate) VALUES ('" + driver.DriverName + "' , '" + strconv.Itoa(driver.Rate) + "')",
 	}
 
 	err = driverSchema.ExecDB()
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	} else {
-		http.Error(w, "Driver added", http.StatusOK)
+		w.WriteHeader(http.StatusCreated)
 		return
 	}
 
