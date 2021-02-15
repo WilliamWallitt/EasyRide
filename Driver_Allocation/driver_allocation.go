@@ -173,7 +173,7 @@ func getSurgePricingRosterHandler(origin string, destination string) (struct {
 	if err != nil {
 		return roster[0], err
 	}
-	roster[driverIndex].Rate = currBest
+	roster[driverIndex].Rate = currBest / 100
 	return roster[driverIndex], nil
 
 }

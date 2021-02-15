@@ -37,5 +37,11 @@
       <jdbc-driver>org.sqlite.JDBC</jdbc-driver>
       <jdbc-url>jdbc:sqlite:$PROJECT_DIR$/Driver_Authentication/driver_auth</jdbc-url>
     </data-source>
+    <data-source source="LOCAL" name="roster_management [2]" uuid="887a98b3-3e60-4b88-a2af-3a6477d5b543">
+      <driver-ref>sqlite.xerial</driver-ref>
+      <synchronize>true</synchronize>
+      <jdbc-driver>org.sqlite.JDBC</jdbc-driver>
+      <jdbc-url>jdbc:sqlite:$PROJECT_DIR$/Roster_Management_/roster_management</jdbc-url>
+    </data-source>
   </component>
 </project>

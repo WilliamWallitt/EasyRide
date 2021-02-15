@@ -9,9 +9,9 @@ var DriverAuthDBPath = "./Driver_Authentication/driver_auth"
 func CreateDatabases() error {
 
 	databaseMapping := map[string]string {
-		RosterDBPath: "CREATE TABLE IF NOT EXISTS roster (id INTEGER PRIMARY KEY, Drivername TEXT, Rate INTEGER )",
-		DriverDBPath: "CREATE TABLE IF NOT EXISTS drivers (id INTEGER PRIMARY KEY, Drivername TEXT, Rate INTEGER )",
-		DriverAuthDBPath: "CREATE TABLE IF NOT EXISTS auth (id INTEGER PRIMARY KEY, Username TEXT, Password TEXT)",
+		RosterDBPath: "CREATE TABLE IF NOT EXISTS roster (id INTEGER PRIMARY KEY, Drivername TEXT, Rate INTEGER)",
+		DriverDBPath: "CREATE TABLE IF NOT EXISTS drivers (id INTEGER PRIMARY KEY, Drivername TEXT, Rate INTEGER)",
+		DriverAuthDBPath: "CREATE TABLE IF NOT EXISTS auth (id INTEGER PRIMARY KEY, Username TEXT NOT NULL UNIQUE, Password TEXT)",
 	}
 
 	dbSchema := Database{
