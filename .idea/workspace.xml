@@ -1,15 +1,37 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
+  <component name="BranchesTreeState">
+    <expand>
+      <path>
+        <item name="ROOT" type="e8cecc67:BranchNodeDescriptor" />
+        <item name="LOCAL_ROOT" type="e8cecc67:BranchNodeDescriptor" />
+      </path>
+      <path>
+        <item name="ROOT" type="e8cecc67:BranchNodeDescriptor" />
+        <item name="REMOTE_ROOT" type="e8cecc67:BranchNodeDescriptor" />
+      </path>
+      <path>
+        <item name="ROOT" type="e8cecc67:BranchNodeDescriptor" />
+        <item name="REMOTE_ROOT" type="e8cecc67:BranchNodeDescriptor" />
+        <item name="GROUP_NODE:origin" type="e8cecc67:BranchNodeDescriptor" />
+      </path>
+    </expand>
+    <select />
+  </component>
   <component name="ChangeListManager">
     <list default="true" id="8a000667-dd99-4bea-9c17-6ea097e32212" name="Default Changelist" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/dataSources.local.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/dataSources.local.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/dataSources.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/dataSources.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Database_Management/create_databases.go" beforeDir="false" afterPath="$PROJECT_DIR$/Database_Management/create_databases.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Dockerfile" beforeDir="false" afterPath="$PROJECT_DIR$/Dockerfile" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Driver_Allocation/driver_allocation.go" beforeDir="false" afterPath="$PROJECT_DIR$/Driver_Allocation/driver_allocation.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Driver_Authentication/driver_auth" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Driver_Authentication/driver_auth.go" beforeDir="false" afterPath="$PROJECT_DIR$/Driver_Authentication/driver_auth.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Driver_Authentication/middleware.go" beforeDir="false" afterPath="$PROJECT_DIR$/Driver_Authentication/middleware.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Trip_Mangement/trip_management.go" beforeDir="false" afterPath="$PROJECT_DIR$/Trip_Mangement/trip_management.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Driver_Management_/driver_management" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Driver_Management_/driver_management.go" beforeDir="false" afterPath="$PROJECT_DIR$/Driver_Management_/driver_management.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Roster_Management_/roster_management" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Roster_Management_/roster_management.go" beforeDir="false" afterPath="$PROJECT_DIR$/Roster_Management_/roster_management.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Trip_Mangement/trip_management.go" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/main.go" beforeDir="false" afterPath="$PROJECT_DIR$/main.go" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -28,7 +50,9 @@
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
   <component name="ProjectId" id="1nwcGTkjAyOLr2wpCj2XjxtJ2O5" />
-  <component name="ProjectLevelVcsManager" settingsEditedManually="true" />
+  <component name="ProjectLevelVcsManager" settingsEditedManually="true">
+    <ConfirmationsSetting value="1" id="Add" />
+  </component>
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
@@ -128,6 +152,18 @@
   <component name="TypeScriptGeneratedFilesManager">
     <option name="version" value="3" />
   </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State />
+          </value>
+        </entry>
+      </map>
+    </option>
+    <option name="oldMeFiltersMigrated" value="true" />
+  </component>
   <component name="WindowStateProjectService">
     <state x="1537" y="532" key="#SQL_Dialects" timestamp="1612377314372">
       <screen x="0" y="23" width="3440" height="1417" />
@@ -177,10 +213,15 @@
       <screen x="0" y="23" width="3440" height="1417" />
     </state>
     <state width="2121" height="472" key="GridCell.Tab.1.right/0.23.3440.1417/663.1463.1680.953@0.23.3440.1417" timestamp="1612796556910" />
-    <state x="1791" y="314" width="670" height="641" key="search.everywhere.popup" timestamp="1612815628116">
-      <screen x="0" y="23" width="3440" height="1343" />
+    <state x="2047" y="614" key="com.intellij.openapi.vcs.update.UpdateOrStatusOptionsDialogupdate-v2" timestamp="1613516620425">
+      <screen x="0" y="25" width="3440" height="1415" />
+    </state>
+    <state x="2047" y="614" key="com.intellij.openapi.vcs.update.UpdateOrStatusOptionsDialogupdate-v2/0.25.3440.1415/663.1465.1680.946@0.25.3440.1415" timestamp="1613516620425" />
+    <state x="1791" y="332" width="670" height="676" key="search.everywhere.popup" timestamp="1613433255191">
+      <screen x="0" y="25" width="3440" height="1415" />
     </state>
     <state x="1791" y="314" width="670" height="641" key="search.everywhere.popup/0.23.3440.1343/663.1463.1680.1027@0.23.3440.1343" timestamp="1612815628116" />
     <state x="1791" y="330" width="670" height="676" key="search.everywhere.popup/0.23.3440.1417/663.1463.1680.953@0.23.3440.1417" timestamp="1612533812920" />
+    <state x="1791" y="332" width="670" height="676" key="search.everywhere.popup/0.25.3440.1415/663.1465.1680.946@0.25.3440.1415" timestamp="1613433255191" />
   </component>
 </project>

@@ -3,19 +3,23 @@ package Driver_Authentication
 import (
 	"encoding/json"
 	"enterprise_computing_cw/Database_Management"
-	"fmt"
+	"enterprise_computing_cw/Error_Management"
 	"github.com/dgrijalva/jwt-go"
 	_ "github.com/mattn/go-sqlite3"
 	"golang.org/x/crypto/bcrypt"
-	"log"
 	"net/http"
 	"time"
 )
 
-type Auth struct {
-	Username string `json:"Username"`
-	Password string `json:"Password"`
+//type Auth struct {
+//	Username string `validate:"required"`
+//	Password string `validate:"required"`
+//}
+
+type Error struct {
+	Errors []string
 }
+
 
 // jwt stuff
 var jwtKey = []byte("my_secret_key")
@@ -27,11 +31,8 @@ type Claims struct {
 
 
 func hashAndSaltPwd(pwd string) string {
-	byte_pwd := []byte(pwd)
-	hash, err := bcrypt.GenerateFromPassword(byte_pwd, bcrypt.MinCost)
-	if err != nil {
-		log.Println(err)
-	}
+	bytePwd := []byte(pwd)
+	hash, _ := bcrypt.GenerateFromPassword(bytePwd, bcrypt.MinCost)
 	return string(hash)
 }
 
@@ -39,7 +40,6 @@ func verifyPassword(hash string, pwd []byte) bool {
 	byteHash := []byte(hash)
 	err := bcrypt.CompareHashAndPassword(byteHash, pwd)
 	if err != nil {
-		log.Println(err)
 		return false
 	}
 	return true
@@ -47,14 +47,28 @@ func verifyPassword(hash string, pwd []byte) bool {
 
 
 func SignUp(w http.ResponseWriter, r *http.Request) {
-	//w.Header().Set("Content-Type", "application/json")
-	fmt.Println("Endpoint: signUp")
-	var newUser Auth
+
+
+	var newUser Error_Management.Auth
 	err := json.NewDecoder(r.Body).Decode(&newUser)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
+	model, e := Error_Management.FormValidationHandler(newUser)
+
+	if e.ResponseCode != http.StatusOK {
+		w.WriteHeader(e.ResponseCode)
+		err := json.NewEncoder(w).Encode(e)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+		return
+	}
+	// m points to model interface
+	m := *model
+	// cast interface m to struct Auth
+	newUser = m.(Error_Management.Auth)
 
 	authSchema := Database_Management.Database{
 		DbName: Database_Management.DriverAuthDBPath,
@@ -70,14 +84,28 @@ func SignUp(w http.ResponseWriter, r *http.Request) {
 }
 
 func SignIn(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	fmt.Println("Endpoint: signIn")
-	var newUser Auth
+
+	var newUser Error_Management.Auth
 	err := json.NewDecoder(r.Body).Decode(&newUser)
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+	model, e := Error_Management.FormValidationHandler(newUser)
+
+	if e.ResponseCode != http.StatusOK {
+		w.WriteHeader(e.ResponseCode)
+		err := json.NewEncoder(w).Encode(e)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+		return
+	}
+
+	// m points to model interface
+	m := *model
+	// cast interface m to struct Auth
+	newUser = m.(Error_Management.Auth)
 
 	authSchema := Database_Management.Database{
 		DbName: Database_Management.DriverAuthDBPath,
@@ -92,7 +120,7 @@ func SignIn(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if rows == nil {
-		w.WriteHeader(http.StatusUnauthorized)
+		w.WriteHeader(http.StatusNoContent)
 		return
 	}
 
@@ -117,7 +145,7 @@ func SignIn(w http.ResponseWriter, r *http.Request) {
 
 			// create token with server secret + claims data
 			token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-			// token -> string(token)
+			// token -> signed string(token)
 			tokenString, err := token.SignedString(jwtKey)
 			if err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
@@ -140,8 +168,6 @@ func SignIn(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetAllUsers(w http.ResponseWriter, r *http.Request) {
-
-	fmt.Println("Endpoint: getAllUsers")
 
 	authSchema := Database_Management.Database{
 		DbName: Database_Management.DriverAuthDBPath,

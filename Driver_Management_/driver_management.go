@@ -3,7 +3,9 @@ package Driver_Management_
 import (
 	"encoding/json"
 	"enterprise_computing_cw/Database_Management"
-	"github.com/gorilla/mux"
+	"enterprise_computing_cw/Error_Management"
+	"fmt"
+	"github.com/gorilla/context"
 	_ "github.com/mattn/go-sqlite3"
 	"log"
 	"net/http"
@@ -18,8 +20,6 @@ type Driver struct {
 
 
 func GetAllDriversHandler(w http.ResponseWriter, r *http.Request) {
-
-	w.Header().Set("Content-Type", "application/json")
 
 	var id int
 	var DriverName string
@@ -68,39 +68,49 @@ func GetAllDriversHandler(w http.ResponseWriter, r *http.Request) {
 
 func UpdateDriverHandler(w http.ResponseWriter, r *http.Request) {
 
-	w.Header().Set("Content-Type", "application/json")
-	vars := mux.Vars(r)
-	driverId := vars["id"]
+	var driverName = context.Get(r, "driverName")
+	var driverJson Error_Management.Driver
 
-	var driver Driver
-	err := json.NewDecoder(r.Body).Decode(&driver)
+	err := json.NewDecoder(r.Body).Decode(&driverJson)
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
+	model, e := Error_Management.FormValidationHandler(driverJson)
+
+	if e.ResponseCode != http.StatusOK {
+		w.WriteHeader(e.ResponseCode)
+		err := json.NewEncoder(w).Encode(e)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+		return
+	}
+
+	m := *model
+	driverJson = m.(Error_Management.Driver)
+
 	driverSchema := Database_Management.Database{
 		DbName: Database_Management.DriverDBPath,
-		Query:  "UPDATE drivers SET Rate = (" + "'" + strconv.Itoa(driver.Rate) +"'"+ ") " +
-			"WHERE id = (" + "'" + driverId + "'" + ")",
+		Query:  "UPDATE drivers SET Rate = (" + "'" + strconv.Itoa(driverJson.Rate) +"'"+ ") " +
+			"WHERE Drivername = (" + "'" + fmt.Sprintf("%v", driverName) + "'" + ")",
 	}
 
 	err = driverSchema.ExecDB()
 
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
+		w.WriteHeader(http.StatusNoContent)
 		return
 	}
 }
 
 
 func GetDriverHandler(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	driverId := vars["id"]
 
 	driverSchema := Database_Management.Database{
 		DbName: Database_Management.DriverDBPath,
-		Query:  "SELECT id, Drivername, Rate FROM drivers WHERE id=('" + driverId + "')",
+		Query:  "SELECT id, Drivername, Rate FROM drivers WHERE Drivername=('" + fmt.Sprintf("%v", context.Get(r, "driverName")) + "')",
 	}
 
 	rows, err := driverSchema.QueryDB()
@@ -141,26 +151,39 @@ func GetDriverHandler(w http.ResponseWriter, r *http.Request) {
 
 func CreateDriverHandler(w http.ResponseWriter, r *http.Request) {
 
-	w.Header().Set("Content-Type", "application/json")
-	var driver Driver
-	err := json.NewDecoder(r.Body).Decode(&driver)
+
+	var driverJson Error_Management.Driver
+	err := json.NewDecoder(r.Body).Decode(&driverJson)
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
+	model, e := Error_Management.FormValidationHandler(driverJson)
+
+	if e.ResponseCode != http.StatusOK {
+		w.WriteHeader(e.ResponseCode)
+		err := json.NewEncoder(w).Encode(e)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+		return
+	}
+
+	m := *model
+	driverJson = m.(Error_Management.Driver)
+
 	driverSchema := Database_Management.Database{
 		DbName: Database_Management.DriverDBPath,
-		Query:  "INSERT INTO drivers (Drivername, Rate) VALUES ('" + driver.DriverName + "' , '" + strconv.Itoa(driver.Rate) + "')",
+		Query:  "INSERT INTO drivers (Drivername, Rate) VALUES " +
+			"('" + fmt.Sprintf("%v", context.Get(r, "driverName")) +
+			"' , '" + strconv.Itoa(driverJson.Rate) + "')",
 	}
 
 	err = driverSchema.ExecDB()
 
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		return
-	} else {
-		w.WriteHeader(http.StatusCreated)
 		return
 	}
 
