@@ -3,7 +3,6 @@ package Driver_Allocation
 import (
 	"encoding/json"
 	"enterprise_computing_cw/Error_Management"
-	"enterprise_computing_cw/Roster_Management_"
 	"io/ioutil"
 	"math"
 	"net/http"
@@ -15,6 +14,13 @@ import (
 
 // for the list of current drivers in the roster
 type Roster []struct {
+	Id int `json:"id"`
+	DriverName string `json:"DriverName"`
+	Rate float64 `json:"Rate"`
+}
+
+// for the best driver selected from the roster
+type driver struct {
 	Id int `json:"id"`
 	DriverName string `json:"DriverName"`
 	Rate float64 `json:"Rate"`
@@ -34,7 +40,7 @@ type Response struct {
 	}
 }
 
-
+// checks the current time and returns a boolean (True if surge pricing applies, False otherwise)
 func getSurgePricingTimeHandler(currPrice float64) float64 {
 	hour := time.Now().Hour()
 	if hour > 23 || hour < 6 {
@@ -43,10 +49,11 @@ func getSurgePricingTimeHandler(currPrice float64) float64 {
 	return currPrice
 }
 
-
+// function that uses the origin and destination with the google maps API
+// to extract the total distance and pricing (with / without surge pricing) for a driver
 func getSurgePricingRouteHandler(origin string, destination string, driverRate float64) (float64, error) {
 
-	resp, err := http.Get("https://maps.googleapis.com/maps/api/directions/json?origin="+
+	resp, err := http.Get("https://maps.googleapis.com/maps/api/directions/json?units=metric&region=UK&origin="+
 		origin+"&destination="+destination+"&key=" + "AIzaSyB2rJrmiL6i3APBb-IMOoykhj8IYqiWc6k")
 
 
@@ -78,20 +85,23 @@ func getSurgePricingRouteHandler(origin string, destination string, driverRate f
 	legs := directions.Routes[0].Legs
 	numARoads, totalDistance := 0, float64(0)
 
-
-
 	for i, s := range legs[0].Steps {
 		distance, instructions := s.Distance.Text, s.HtmlInstructions
 		isARoad := instructionsHelper(instructions)
 		if isARoad {
 			numARoads += 1
 		}
+
 		roadDistance, err := distanceHelper(distance)
 		if err != nil {
 			return 0, err
 		}
 		totalDistance += roadDistance
 		if i == len(legs[0].Steps) - 1 {
+
+			if numARoads == 0 {
+				return driverRate * totalDistance, nil
+			}
 
 			if i / numARoads < 2 {
 				return driverRate * totalDistance * 2, nil
@@ -107,7 +117,7 @@ func getSurgePricingRouteHandler(origin string, destination string, driverRate f
 
 }
 
-
+// parses the google maps distance string into an float value in km
 func distanceHelper(distance string) (float64, error) {
 	var number float64
 	for pos, char := range distance {
@@ -127,6 +137,8 @@ func distanceHelper(distance string) (float64, error) {
 
 }
 
+// parses the google maps html instruction string returns a boolean
+// True if the road is an A road, False otherwise
 func instructionsHelper(instructions string) bool {
 	substrings := []string{"A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8", "A9"}
 
@@ -139,8 +151,9 @@ func instructionsHelper(instructions string) bool {
 
 }
 
-
-func getSurgePricingRosterHandler(origin string, destination string) (*Roster_Management_.Roster, error) {
+// combines the time surge pricing handler and route surge pricing handler to calculate the final rate
+// for each driver, and returns a sturct of the best driver (id, driver name, final rate)
+func getSurgePricingRosterHandler(origin string, destination string) (*driver, error) {
 
 
 	body, err := http.Get("http://localhost:10000/rosters")
@@ -160,16 +173,17 @@ func getSurgePricingRosterHandler(origin string, destination string) (*Roster_Ma
 	currBest := math.Inf(1)
 	var driverIndex int
 
-
 	for i, driver := range roster {
 		routePrice, err := getSurgePricingRouteHandler(origin, destination, driver.Rate)
 		if err != nil || routePrice == 0 {
 			return nil, err
 		}
 		currPrice := getSurgePricingTimeHandler(routePrice)
+
 		if len(roster) < 5 {
 			currPrice *= 2
 		}
+
 		if currPrice < currBest {
 			currBest = currPrice
 			driverIndex = i
@@ -182,17 +196,17 @@ func getSurgePricingRosterHandler(origin string, destination string) (*Roster_Ma
 	}
 	// convert pence/km to pound/km
 	roster[driverIndex].Rate = currBest / 100
-	bestDriver := Roster_Management_.Roster {
+	bestDriver := driver {
 		Id: roster[driverIndex].Id,
 		DriverName: roster[driverIndex].DriverName,
-		Rate: int(roster[driverIndex].Rate),
+		Rate: roster[driverIndex].Rate,
 	}
 
 	return &bestDriver, nil
 
 }
 
-
+// http handler for the allocation route - getting the best driver for the trip
 func GetBestDriverHandler(w http.ResponseWriter, r *http.Request){
 
 
@@ -219,6 +233,7 @@ func GetBestDriverHandler(w http.ResponseWriter, r *http.Request){
 	trip = m.(Error_Management.Trip)
 
 	bestDriver, err := getSurgePricingRosterHandler(trip.Origin, trip.Destination)
+
 	if err != nil {
 
 		w.WriteHeader(http.StatusNoContent)

@@ -21,17 +21,9 @@
   <component name="ChangeListManager">
     <list default="true" id="8a000667-dd99-4bea-9c17-6ea097e32212" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Database_Management/create_databases.go" beforeDir="false" afterPath="$PROJECT_DIR$/Database_Management/create_databases.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Driver_Allocation/driver_allocation.go" beforeDir="false" afterPath="$PROJECT_DIR$/Driver_Allocation/driver_allocation.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Driver_Authentication/driver_auth" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Driver_Authentication/driver_auth.go" beforeDir="false" afterPath="$PROJECT_DIR$/Driver_Authentication/driver_auth.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Driver_Authentication/middleware.go" beforeDir="false" afterPath="$PROJECT_DIR$/Driver_Authentication/middleware.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Driver_Management_/driver_management" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Driver_Management_/driver_management.go" beforeDir="false" afterPath="$PROJECT_DIR$/Driver_Management_/driver_management.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Roster_Management_/roster_management" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Roster_Management_/roster_management.go" beforeDir="false" afterPath="$PROJECT_DIR$/Roster_Management_/roster_management.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Trip_Mangement/trip_management.go" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/main.go" beforeDir="false" afterPath="$PROJECT_DIR$/main.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Driver_Management_/driver_management" beforeDir="false" afterPath="$PROJECT_DIR$/Driver_Management_/driver_management" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Roster_Management_/roster_management" beforeDir="false" afterPath="$PROJECT_DIR$/Roster_Management_/roster_management" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
