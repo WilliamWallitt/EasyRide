@@ -56,7 +56,6 @@ func getSurgePricingRouteHandler(origin string, destination string, driverRate f
 	resp, err := http.Get("https://maps.googleapis.com/maps/api/directions/json?units=metric&region=UK&origin="+
 		origin+"&destination="+destination+"&key=" + "AIzaSyB2rJrmiL6i3APBb-IMOoykhj8IYqiWc6k")
 
-
 	if err != nil {
 		return 0, err
 	}
