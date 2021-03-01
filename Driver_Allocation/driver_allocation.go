@@ -1,9 +1,12 @@
-package Driver_Allocation
+package main
 
 import (
 	"encoding/json"
-	"enterprise_computing_cw/Error_Management"
+	"app/Libraries/Error_Management"
+	"fmt"
+	"github.com/gorilla/mux"
 	"io/ioutil"
+	"log"
 	"math"
 	"net/http"
 	"strconv"
@@ -65,6 +68,7 @@ func getSurgePricingRouteHandler(origin string, destination string, driverRate f
 		return 0, nil
 	}
 
+	// we are taking our json maps response and extracting the information we need into the Response struct
 	var directions Response
 	err = json.Unmarshal(body, &directions)
 	if err != nil {
@@ -76,21 +80,25 @@ func getSurgePricingRouteHandler(origin string, destination string, driverRate f
 		return 0, err
 	}
 
+	// check that there are directions to extract the distance and instructions from
 	if len(directions.Routes) < 1 {
 		return 0, err
 	}
 
-
+	// get current legs of the route
 	legs := directions.Routes[0].Legs
+	// storing the number of A roads and total distance
 	numARoads, totalDistance := 0, float64(0)
 
+	// iterate over each step in legs[0].Steps
 	for i, s := range legs[0].Steps {
 		distance, instructions := s.Distance.Text, s.HtmlInstructions
+		// check if the instructions contain an A road
 		isARoad := instructionsHelper(instructions)
+		// if there is an A road, add 1 to numARoads
 		if isARoad {
 			numARoads += 1
 		}
-
 		roadDistance, err := distanceHelper(distance)
 		if err != nil {
 			return 0, err
@@ -154,8 +162,7 @@ func instructionsHelper(instructions string) bool {
 // for each driver, and returns a sturct of the best driver (id, driver name, final rate)
 func getSurgePricingRosterHandler(origin string, destination string) (*driver, error) {
 
-
-	body, err := http.Get("http://localhost:10000/rosters")
+	body, err := http.Get("http://host.docker.internal:3002/rosters")
 	if err != nil {
 		return nil, err
 	}
@@ -193,8 +200,12 @@ func getSurgePricingRosterHandler(origin string, destination string) (*driver, e
 	if err != nil {
 		return nil, err
 	}
-	// convert pence/km to pound/km
-	roster[driverIndex].Rate = currBest / 100
+	// convert pence/km to pound/km and round to 2 decimal places
+	rate, err := strconv.ParseFloat(fmt.Sprintf("%.2f", currBest / 100), 64)
+	if err != nil {
+		return nil, err
+	}
+	roster[driverIndex].Rate = rate
 	bestDriver := driver {
 		Id: roster[driverIndex].Id,
 		DriverName: roster[driverIndex].DriverName,
@@ -207,7 +218,6 @@ func getSurgePricingRosterHandler(origin string, destination string) (*driver, e
 
 // http handler for the allocation route - getting the best driver for the trip
 func GetBestDriverHandler(w http.ResponseWriter, r *http.Request){
-
 
 	var trip Error_Management.Trip
 	err := json.NewDecoder(r.Body).Decode(&trip)
@@ -234,8 +244,7 @@ func GetBestDriverHandler(w http.ResponseWriter, r *http.Request){
 	bestDriver, err := getSurgePricingRosterHandler(trip.Origin, trip.Destination)
 
 	if err != nil {
-
-		w.WriteHeader(http.StatusNoContent)
+		w.WriteHeader(http.StatusBadRequest)
 		_ = json.NewEncoder(w).Encode(err)
 		return
 	}
@@ -250,6 +259,22 @@ func GetBestDriverHandler(w http.ResponseWriter, r *http.Request){
 		w.WriteHeader(http.StatusInternalServerError)
 		_ = json.NewEncoder(w).Encode(err)
 		return
+	}
+
+}
+
+
+func main () {
+
+	authRouter := mux.NewRouter().StrictSlash(true)
+
+	// get best driver (POST)
+	//curl -H "Content-Type: application/json" -X POST -d '{"Origin":"London","Destination":"Exeter"}' http://localhost:8083/allocation
+
+	authRouter.HandleFunc("/allocation", GetBestDriverHandler).Methods("POST")
+	err := http.ListenAndServe(":8083", authRouter)
+	if err != nil {
+		log.Fatal(err)
 	}
 
 }

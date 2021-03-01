@@ -1,11 +1,13 @@
-package Driver_Management_
+package main
 
 import (
 	"encoding/json"
-	"enterprise_computing_cw/Database_Management"
-	"enterprise_computing_cw/Error_Management"
+	"app/Libraries/Database_Management"
+	"app/Libraries/Error_Management"
+	"app/Libraries/Middleware"
 	"fmt"
 	"github.com/gorilla/context"
+	"github.com/gorilla/mux"
 	_ "github.com/mattn/go-sqlite3"
 	"log"
 	"net/http"
@@ -26,13 +28,11 @@ func GetAllDriversHandler(w http.ResponseWriter, r *http.Request) {
 	var Rate int
 	var drivers []Driver
 
-
 	driverSchema := Database_Management.Database{
 		DbName: Database_Management.DriverDBPath,
 		Query:  "SELECT id, Drivername, Rate FROM drivers",
 	}
 
-	//driverSchema.Query = "SELECT id, Drivername, Rate FROM drivers"
 	rows, err := driverSchema.QueryDB()
 
 	if err != nil {
@@ -106,49 +106,6 @@ func UpdateDriverHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 
-func GetDriverHandler(w http.ResponseWriter, r *http.Request) {
-
-	driverSchema := Database_Management.Database{
-		DbName: Database_Management.DriverDBPath,
-		Query:  "SELECT id, Drivername, Rate FROM drivers WHERE Drivername=('" + fmt.Sprintf("%v", context.Get(r, "driverName")) + "')",
-	}
-
-	rows, err := driverSchema.QueryDB()
-
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	if rows == nil {
-		w.WriteHeader(http.StatusNoContent)
-		return
-	}
-
-	var id, rate int
-	var driverName string
-	//var driverName string
-	var driver Driver
-
-	for rows.Next() {
-		err := rows.Scan(&id, &driverName, &rate)
-
-		driver = Driver{
-			Id: id,
-			DriverName: driverName,
-			Rate: rate,
-		}
-
-		err = json.NewEncoder(w).Encode(driver)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-	}
-
-}
-
-
 func CreateDriverHandler(w http.ResponseWriter, r *http.Request) {
 
 
@@ -188,3 +145,37 @@ func CreateDriverHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 }
+
+func main() {
+
+
+	err := Database_Management.CreateDatabase(Database_Management.DriverDBPath, Database_Management.DriverDBInit)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	authRouter := mux.NewRouter().StrictSlash(true)
+
+	//authRouter.Use(Middleware.AuthMiddleware)
+
+	// get all drivers (GET)
+	// curl -v -X GET localhost:10000/drivers
+	authRouter.Handle("/drivers", Middleware.AuthMiddleware(GetAllDriversHandler)).Methods("GET")
+
+	// create driver (POST)
+	//curl -H "Content-Type: application/json" -X POST -d '{"Rate":11}' http://localhost:10000/drivers
+	authRouter.Handle("/drivers", Middleware.AuthMiddleware(CreateDriverHandler)).Methods("POST")
+
+	// update driver (PUT)
+	// curl -X PUT -H "Content-Type: application/json" -d '{"Rate":11}' http://localhost:8081/drivers
+	authRouter.Handle("/drivers", Middleware.AuthMiddleware(UpdateDriverHandler)).Methods("PUT")
+
+	err = http.ListenAndServe(":8081", authRouter)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+
+

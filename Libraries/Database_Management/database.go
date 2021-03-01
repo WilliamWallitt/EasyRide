@@ -13,6 +13,7 @@ type Database struct {
 // delete, update, create db methods
 
 func (db *Database) ExecDB() error {
+
 	_db, err := sql.Open("sqlite3", db.DbName)
 	if err != nil {
 		return err

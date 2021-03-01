@@ -1,27 +1,25 @@
-package Driver_Authentication
+package main
 
 import (
+	"app/Libraries/Database_Management"
+	"app/Libraries/Error_Management"
+	"app/Libraries/Middleware"
 	"encoding/json"
-	"enterprise_computing_cw/Database_Management"
-	"enterprise_computing_cw/Error_Management"
+	"fmt"
 	"github.com/dgrijalva/jwt-go"
+	"github.com/gorilla/mux"
 	_ "github.com/mattn/go-sqlite3"
 	"golang.org/x/crypto/bcrypt"
+	"io/ioutil"
+	"log"
 	"net/http"
 	"time"
 )
-
-//type Auth struct {
-//	Username string `validate:"required"`
-//	Password string `validate:"required"`
-//}
 
 type Error struct {
 	Errors []string
 }
 
-
-// jwt stuff
 var jwtKey = []byte("my_secret_key")
 
 type Claims struct {
@@ -48,19 +46,20 @@ func verifyPassword(hash string, pwd []byte) bool {
 
 func SignUp(w http.ResponseWriter, r *http.Request) {
 
-
 	var newUser Error_Management.Auth
 	err := json.NewDecoder(r.Body).Decode(&newUser)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
+
 	model, e := Error_Management.FormValidationHandler(newUser)
 
 	if e.ResponseCode != http.StatusOK {
 		w.WriteHeader(e.ResponseCode)
 		err := json.NewEncoder(w).Encode(e)
 		if err != nil {
+			fmt.Println("JSON err", err)
 			w.WriteHeader(http.StatusInternalServerError)
 		}
 		return
@@ -76,6 +75,8 @@ func SignUp(w http.ResponseWriter, r *http.Request) {
 	}
 
 	err = authSchema.ExecDB()
+
+	fmt.Println("DB err", err)
 
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -169,10 +170,20 @@ func SignIn(w http.ResponseWriter, r *http.Request) {
 
 func GetAllUsers(w http.ResponseWriter, r *http.Request) {
 
+	files, err := ioutil.ReadDir("./")
+	if err != nil {
+		log.Fatal(err)
+	}
+	for _, f := range files {
+		fmt.Println(f.Name())
+	}
+
 	authSchema := Database_Management.Database{
 		DbName: Database_Management.DriverAuthDBPath,
 		Query:  "SELECT id, Username, Password FROM auth",
 	}
+
+	fmt.Println(authSchema)
 
 	rows, err := authSchema.QueryDB()
 	if err != nil {
@@ -214,6 +225,30 @@ func GetAllUsers(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-
-
 }
+
+
+func main() {
+
+	Database_Management.CreateDatabase(Database_Management.DriverAuthDBPath, Database_Management.DriverAuthDBInit)
+
+	authRouter := mux.NewRouter().StrictSlash(true)
+
+	// get all users (GET) - remove
+	// curl -v -X GET localhost:10000/auth/users
+	authRouter.Handle("/auth/users", Middleware.AuthMiddleware(GetAllUsers)).Methods("GET")
+
+	// user login (POST)
+	//curl -H "Content-Type: application/json" -X POST -d '{"Username":"root","Password":"root"}' http://localhost:8080/login
+	authRouter.HandleFunc("/login", SignIn).Methods("POST")
+
+	// user signup (POST)
+	//curl -H "Content-Type: application/json" -X POST -d '{"Username":"root","Password":"root"}' http://localhost:8080/signup
+	authRouter.HandleFunc("/signup", SignUp).Methods("POST")
+
+	err := http.ListenAndServe(":8080", authRouter)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+

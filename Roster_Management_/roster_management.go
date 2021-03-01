@@ -1,16 +1,19 @@
-package Roster_Management_
+package main
 
 import (
 	"encoding/json"
-	"enterprise_computing_cw/Database_Management"
-	"enterprise_computing_cw/Error_Management"
+	"app/Libraries/Database_Management"
+	"app/Libraries/Error_Management"
+	"app/Libraries/Middleware"
 	"fmt"
 	"github.com/gorilla/context"
+	"github.com/gorilla/mux"
 	_ "github.com/mattn/go-sqlite3"
 	"log"
 	"net/http"
 	"strconv"
 )
+
 
 type Roster struct {
 	Id int `json:"id"`
@@ -18,10 +21,10 @@ type Roster struct {
 	Rate int `json:"Rate"`
 }
 
-
+// AddDriverToRoster takes in a Roster struct and creates a query to store a new driver in the Roster_DB and executes that query
 func AddDriverToRoster(driver Roster) error {
 
-
+	// create Schema using the db path and query (using driver information)
 	rosterSchema := Database_Management.Database{
 		DbName: Database_Management.RosterDBPath,
 		Query:  "INSERT INTO roster (Drivername, Rate) VALUES " +
@@ -29,8 +32,10 @@ func AddDriverToRoster(driver Roster) error {
 			",'"  + strconv.Itoa(driver.Rate) + "')",
 	}
 
+	// execute query
 	err := rosterSchema.ExecDB()
 
+	// checking that query didn't lead to any DB errors
 	if err != nil {
 		return err
 	} else {
@@ -39,15 +44,19 @@ func AddDriverToRoster(driver Roster) error {
 
 }
 
+// RemoveDriverFromRoster takes in the driver name and deletes that driver from the roster (all drivernames are unique)
 func RemoveDriverFromRoster(driverName string) error {
 
+	// create schema using db name and query (using driver name)
 	rosterSchema := Database_Management.Database{
 		DbName: Database_Management.RosterDBPath,
 		Query:  "DELETE FROM roster WHERE Drivername=('" + driverName + "')",
 	}
 
+	// execute query
 	err := rosterSchema.ExecDB()
 
+	// checking that query didn't lead to any DB errors
 	if err != nil {
 		return err
 	} else {
@@ -56,11 +65,12 @@ func RemoveDriverFromRoster(driverName string) error {
 
 }
 
+// AddDriverToRoster gets all drivers from the roster DB and returns then in a []Roster struct
 func GetAllDriversFromRoster() []Roster {
 
 	rosterSchema := Database_Management.Database{
 		DbName: Database_Management.RosterDBPath,
-		Query:  "SELECT id, Drivername, Rate FROM roster",
+		Query:  "SELECT id, Drivername, Rate FROM roster ORDER BY Rate LIMIT 1",
 	}
 
 	rows, _ := rosterSchema.QueryDB()
@@ -145,6 +155,35 @@ func RemoveDriverFromRosterHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+}
+
+
+func main () {
+
+	err := Database_Management.CreateDatabase(Database_Management.RosterDBPath, Database_Management.RosterDBInit)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	authRouter := mux.NewRouter().StrictSlash(true)
+
+	// get all drivers in the roster (GET)
+	// curl -v -X GET http://localhost:8082/rosters
+	authRouter.HandleFunc("/rosters", GetCurrentRosterHandler).Methods("GET")
+
+	// add driver to roster (POST)
+	//curl -H "Content-Type: application/json" -X POST -d '{"Rate":11}' http://localhost:8082/rosters
+	authRouter.Handle("/rosters", Middleware.AuthMiddleware(AddDriverToRosterHandler)).Methods("POST")
+
+	// remove driver from roster (DELETE)
+	//curl -X DELETE http://localhost:8082/rosters
+	authRouter.Handle("/rosters", Middleware.AuthMiddleware(RemoveDriverFromRosterHandler)).Methods("DELETE")
+
+	err = http.ListenAndServe(":8082", authRouter)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 }
 
 
