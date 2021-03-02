@@ -73,15 +73,17 @@ func SignUp(w http.ResponseWriter, r *http.Request) {
 	// create scheme with the query and auth db
 	authSchema := Database_Management.Database{
 		DbName: Database_Management.DriverAuthDBPath,
-		Query:  "INSERT INTO auth (Username, Password) VALUES (" + "'" + newUser.Username + "'" + ", " + "'" + hashAndSaltPwd(newUser.Password) + "'" + ")",
+		Query:  "INSERT INTO auth (Username, Password) VALUES " + "('" + newUser.Username + "'" + ",'" + hashAndSaltPwd(newUser.Password) + "')",
 	}
 
 	// execute the query
 	err = authSchema.ExecDB()
 	// handle any internal db errors
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
+		w.WriteHeader(http.StatusConflict)
 	}
+
+	w.WriteHeader(http.StatusCreated)
 
 }
 
@@ -103,7 +105,7 @@ func SignIn(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(e.ResponseCode)
 		err := json.NewEncoder(w).Encode(e)
 		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
+			w.WriteHeader(http.StatusBadRequest)
 		}
 		return
 	}
@@ -129,7 +131,7 @@ func SignIn(w http.ResponseWriter, r *http.Request) {
 	}
 	// handle if the user doesnt exist
 	if rows == nil {
-		w.WriteHeader(http.StatusNoContent)
+		w.WriteHeader(http.StatusNotFound)
 		return
 	}
 	// variables to store the user's Username and Password
@@ -190,8 +192,6 @@ func GetAllUsers(w http.ResponseWriter, r *http.Request) {
 		Query:  "SELECT id, Username, Password FROM auth",
 	}
 
-	fmt.Println(authSchema)
-
 	rows, err := authSchema.QueryDB()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -242,15 +242,15 @@ func main() {
 	authRouter := mux.NewRouter().StrictSlash(true)
 
 	// get all users (GET) - remove
-	// curl -v -X GET localhost:10000/auth/users
+	// curl -b 'token=<token from user login here>' -X GET localhost:3000/auth/users
 	authRouter.Handle("/auth/users", Middleware.AuthMiddleware(GetAllUsers)).Methods("GET")
 
 	// user login (POST)
-	//curl -H "Content-Type: application/json" -X POST -d '{"Username":"root","Password":"root"}' http://localhost:8080/login
+	// curl -H "Content-Type: application/json" -X POST -i -d '{"Username":"test","Password":"test"}' http://localhost:3000/login
 	authRouter.HandleFunc("/login", SignIn).Methods("POST")
 
 	// user signup (POST)
-	//curl -H "Content-Type: application/json" -X POST -d '{"Username":"root","Password":"root"}' http://localhost:8080/signup
+	//curl -H "Content-Type: application/json" -X POST -d '{"Username":"root","Password":"root"}' http://localhost:3000/signup
 	authRouter.HandleFunc("/signup", SignUp).Methods("POST")
 
 	err := http.ListenAndServe(":8080", authRouter)

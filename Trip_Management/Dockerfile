@@ -22,18 +22,18 @@ RUN mkdir /go/src/app
 
 # add local files the are required by the service
 
-ADD /Driver_Allocation /go/src/app/Driver_Allocation
+ADD /Trip_Management /go/src/app/Trip_Management
 ADD /Libraries /go/src/app/Libraries
 
 # specifiy what directory we will use
-WORKDIR /go/src/app/Driver_Allocation
+WORKDIR /go/src/app/Trip_Management
 
 # build
-RUN go build -o driver_allocation .
+RUN go build -o trip_management .
 
 # entry point of service
-CMD ["/go/src/app/Driver_Allocation/driver_allocation"]
+CMD ["/go/src/app/Trip_Management/trip_management"]
 
 
-#docker run -p 3002:8082 -d v3
-#docker build -t v3 -f Driver_Allocation/Dockerfile .
+#docker run -p 3003:8083 -d v4
+#docker build -t v4 -f Trip_Management/Dockerfile .

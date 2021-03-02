@@ -44,6 +44,6 @@ RUN go build -o roster_management .
 
 CMD ["/go/src/app/Roster_Management/roster_management"]
 
-#docker run -p 3002:8082 -it v3
-#docker build -t v3 -f Roster_Management_/Dockerfile .
-#docker run -p 3002:8082 -d v3
+#docker run -p 3001:8081 -it v2
+#docker build -t v2 -f Roster_Management_/Dockerfile .
+#docker run -p 3001:8081 -d v2

@@ -9,10 +9,11 @@ type Database struct {
 	DbName, Query string
 }
 
-
 // delete, update, create db methods
 
 func (db *Database) ExecDB() error {
+
+	type MyError struct{}
 
 	_db, err := sql.Open("sqlite3", db.DbName)
 	if err != nil {
