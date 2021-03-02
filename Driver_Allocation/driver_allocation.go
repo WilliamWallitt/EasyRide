@@ -7,7 +7,6 @@ import (
 	"github.com/gorilla/mux"
 	"io/ioutil"
 	"log"
-	"math"
 	"net/http"
 	"strconv"
 	"strings"
@@ -16,17 +15,17 @@ import (
 
 
 // for the list of current drivers in the roster
-type Roster []struct {
-	Id int `json:"id"`
+type Roster struct {
 	DriverName string `json:"DriverName"`
 	Rate float64 `json:"Rate"`
+	Total int `json:"Total"`
 }
 
 // for the best driver selected from the roster
 type driver struct {
-	Id int `json:"id"`
 	DriverName string `json:"DriverName"`
 	Rate float64 `json:"Rate"`
+	Price float64
 }
 
 // for the json response of the google maps service
@@ -99,47 +98,59 @@ func getSurgePricingRouteHandler(origin string, destination string, driverRate f
 		if isARoad {
 			numARoads += 1
 		}
+		// get current distance in km for that step
 		roadDistance, err := distanceHelper(distance)
 		if err != nil {
 			return 0, err
 		}
+		// add that distance to the total distance
 		totalDistance += roadDistance
+		// if we have reached the end of our steps
 		if i == len(legs[0].Steps) - 1 {
-
+			// if we have no A roads, no surge pricing
 			if numARoads == 0 {
 				return driverRate * totalDistance, nil
 			}
-
+			// if i divided by the number of A roads is less than 2, then majority A roads
+			// surge pricing applies
 			if i / numARoads < 2 {
 				return driverRate * totalDistance * 2, nil
 			}
+			// otherwise surge pricing doesnt apply
 			if i / numARoads >= 2 {
 				return driverRate * totalDistance, nil
 			}
 		}
 	}
-
+	// in case we don't return anything in the above for loop
 	return 0, err
-
 
 }
 
 // parses the google maps distance string into an float value in km
 func distanceHelper(distance string) (float64, error) {
 	var number float64
+	// for each character in the distance string
 	for pos, char := range distance {
+		// if we get to an "m" or "k" ("km")
 		if string(char) == "m" || string(char) == "k" {
+			// we will convert the previous chars to an float
 			i, err := strconv.ParseFloat(distance[0: pos - 1], 64)
+			// handle errors if this doenst work
 			if err != nil {
 				return 0, err
 			}
+			// convert m to km
 			if string(char) == "m" {
 				i = i / 1000
 			}
+			// store the distance in the number variable
 			number = i
+			// exit the for loop
 			break
 		}
 	}
+	// return the distance
 	return number, nil
 
 }
@@ -162,56 +173,54 @@ func instructionsHelper(instructions string) bool {
 // for each driver, and returns a sturct of the best driver (id, driver name, final rate)
 func getSurgePricingRosterHandler(origin string, destination string) (*driver, error) {
 
+	// get request to the rosters service
 	body, err := http.Get("http://host.docker.internal:3002/rosters")
+	// check an error occured making the request
 	if err != nil {
 		return nil, err
 	}
-
+	// decode the best driver into the Roster struct
 	var roster Roster
 	err = json.NewDecoder(body.Body).Decode(&roster)
 	if err != nil {
 		return  nil, err
 	}
-	if len(roster) < 1 {
-		return  nil, err
+
+	// get the route price (applies route surge pricing if applicable)
+
+	routePrice, err := getSurgePricingRouteHandler(origin, destination, roster.Rate)
+	if err != nil || routePrice == 0 {
+		return nil, err
 	}
 
-	currBest := math.Inf(1)
-	var driverIndex int
+	// add the time surge price if applicable
 
-	for i, driver := range roster {
-		routePrice, err := getSurgePricingRouteHandler(origin, destination, driver.Rate)
-		if err != nil || routePrice == 0 {
-			return nil, err
-		}
-		currPrice := getSurgePricingTimeHandler(routePrice)
+	currPrice := getSurgePricingTimeHandler(routePrice)
 
-		if len(roster) < 5 {
-			currPrice *= 2
-		}
-
-		if currPrice < currBest {
-			currBest = currPrice
-			driverIndex = i
-		}
+	// add the roster surge price if applicable
+	if roster.Total < 5 {
+		currPrice *= 2
 	}
 
+	// close request
 	err = body.Body.Close()
 	if err != nil {
 		return nil, err
 	}
+
 	// convert pence/km to pound/km and round to 2 decimal places
-	rate, err := strconv.ParseFloat(fmt.Sprintf("%.2f", currBest / 100), 64)
+	price, err := strconv.ParseFloat(fmt.Sprintf("%.2f", currPrice / 100), 64)
 	if err != nil {
 		return nil, err
 	}
-	roster[driverIndex].Rate = rate
-	bestDriver := driver {
-		Id: roster[driverIndex].Id,
-		DriverName: roster[driverIndex].DriverName,
-		Rate: roster[driverIndex].Rate,
-	}
 
+	// create a Driver struct with the driver's name, rate and total price of trip
+	bestDriver := driver{
+		DriverName: roster.DriverName,
+		Rate:       roster.Rate,
+		Price:      price,
+	}
+	// return the Driver struct
 	return &bestDriver, nil
 
 }
@@ -219,14 +228,17 @@ func getSurgePricingRosterHandler(origin string, destination string) (*driver, e
 // http handler for the allocation route - getting the best driver for the trip
 func GetBestDriverHandler(w http.ResponseWriter, r *http.Request){
 
+	// decode the user's json request into the Trip struct (origin and destination)
 	var trip Error_Management.Trip
 	err := json.NewDecoder(r.Body).Decode(&trip)
-
+	// handles if any errors have occured doing this
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		_ = json.NewEncoder(w).Encode(err)
 		return
 	}
+
+	// form validation, check that origin and destination fields are correctly filled in
 
 	model, e := Error_Management.FormValidationHandler(trip)
 	if e.ResponseCode != http.StatusOK {
@@ -237,23 +249,26 @@ func GetBestDriverHandler(w http.ResponseWriter, r *http.Request){
 		}
 		return
 	}
+	// as the form validation helper function returns an interface we need to convert
+	// it back into the correct struct
 
 	m := *model
 	trip = m.(Error_Management.Trip)
 
+	// apply all surge pricing if applicable and return the trip price
 	bestDriver, err := getSurgePricingRosterHandler(trip.Origin, trip.Destination)
-
+	// handle any errors that might of occured
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		_ = json.NewEncoder(w).Encode(err)
 		return
 	}
-
+	// handle if the best driver is nil (there are no drivers in the roster)
 	if bestDriver == nil {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
-
+	// otherwise encode the best driver information as the response
 	err = json.NewEncoder(w).Encode(bestDriver)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -266,6 +281,8 @@ func GetBestDriverHandler(w http.ResponseWriter, r *http.Request){
 
 func main () {
 
+
+	// trailing slash is allowed for any route ie /allocation/ allowed and allocation/ allowed
 	authRouter := mux.NewRouter().StrictSlash(true)
 
 	// get best driver (POST)

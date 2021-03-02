@@ -16,7 +16,6 @@ RUN go get -v gopkg.in/go-playground/validator.v9
 RUN go get -v gopkg.in/go-playground/validator.v9/translations/en
 RUN go mod download
 
-
 ## create an /app directory within our docker image
 
 RUN mkdir /go/src/app
